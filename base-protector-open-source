@@ -1,0 +1,135 @@
+local player = game.Players.LocalPlayer
+local potionName = "Body Swap Potion"
+local carpetName = "Flying Carpet"
+local alertKeyword = "stealing your"
+local safeZonePos = Vector3.new(-350, -7, 60)
+
+local startCFrame = nil
+local protectionActive = true
+local kickEnabled = true
+local debounce = false
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiStealGui"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 150)
+frame.Position = UDim2.new(0, 10, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 2
+frame.Active = true
+frame.Draggable = true -- Можно перетаскивать мышкой
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "Anti-Steal Menu"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.Parent = frame
+
+local function createButton(name, text, pos, color)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = UDim2.new(0, 180, 0, 40)
+    btn.Position = pos
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
+    btn.Parent = frame
+    return btn
+end
+
+local protectBtn = createButton("ProtectBtn", "protection: on", UDim2.new(0, 10, 0, 40), Color3.fromRGB(0, 150, 0))
+local kickBtn = createButton("KickBtn", "auto-kick : on", UDim2.new(0, 10, 0, 90), Color3.fromRGB(0, 150, 0))
+
+protectBtn.MouseButton1Click:Connect(function()
+    protectionActive = not protectionActive
+    protectBtn.Text = "protection: " .. (protectionActive and "on" or "off")
+    protectBtn.BackgroundColor3 = protectionActive and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+end)
+
+kickBtn.MouseButton1Click:Connect(function()
+    kickEnabled = not kickEnabled
+    kickBtn.Text = "auto-kick: " .. (kickEnabled and "on" or "off")
+    kickBtn.BackgroundColor3 = kickEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+end)
+
+
+local function saveStartPoint()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    startCFrame = root.CFrame
+end
+saveStartPoint()
+
+local function cleanText(text)
+    if not text then return "" end
+    local noTags = text:gsub("<[^>]+>", "") -- Очистка от RichText
+    local noQuotes = noTags:gsub('["\']', "") -- Удаление кавычек
+    local clean = noQuotes:gsub("[^%w%s%.%-_]", "") -- Только буквы и цифры
+    return clean:match("^%s*(.-)%s*$")
+end
+
+local function runAntiStealProtocol(rawText)
+    if not protectionActive or debounce then return end
+    debounce = true
+    
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not root or not hum then 
+        debounce = false 
+        return 
+    end
+
+    local fullCleanText = cleanText(rawText)
+    local nameMatch = fullCleanText:lower():match("stealing your%s+(.+)")
+    local brainrot = nameMatch or "item"
+
+    local carpet = player.Backpack:FindFirstChild(carpetName) or char:FindFirstChild(carpetName)
+    if carpet then 
+        hum:EquipTool(carpet)
+        task.wait(0.05)
+    end
+
+    root.CFrame = CFrame.new(safeZonePos)
+    task.wait(0.2)
+    root.CFrame = startCFrame
+    task.wait(0.2)
+
+    local potion = player.Backpack:FindFirstChild(potionName) or char:FindFirstChild(potionName)
+    if potion then
+        hum:EquipTool(potion)
+        task.wait(0.05)
+        if potion:IsA("Tool") then
+            potion:Activate()
+            task.wait(0.05)
+        end
+    end
+
+    if kickEnabled then
+        player:Kick("successful saved " .. tostring(brainrot))
+    end
+
+    task.wait(1)
+    debounce = false
+end
+
+local playerGui = player:WaitForChild("PlayerGui")
+playerGui.DescendantAdded:Connect(function(desc)
+    if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
+        task.wait(0.2)
+        local txt = desc.Text
+        if txt and cleanText(txt):lower():find(alertKeyword) then
+            runAntiStealProtocol(txt)
+        end
+    end
+end)
